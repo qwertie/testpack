@@ -1,0 +1,36 @@
+{
+  "name": "packverify",
+  "version": "1.0.0",
+  "description": "Verifies that your package will work after it is published by running your unit tests in a special test folder.",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qwertie/packverify.git"
+  },
+  "keywords": [
+    "npm",
+    "pack",
+    "prepublish",
+    "publish",
+    "verify",
+    "test",
+    "check"
+  ],
+  "author": "David Piepgrass",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/qwertie/packverify/issues"
+  },
+  "homepage": "https://github.com/qwertie/packverify#readme",
+  "dependencies": {
+    "@types/minimist": "^1.2.0",
+    "@types/node": "^10.5.2",
+    "minimist": "^1.2.0"
+  },
+  "devDependencies": {
+    "ts-node": "^7.0.0"
+  }
+}
