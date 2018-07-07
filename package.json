@@ -1,5 +1,5 @@
 {
-  "name": "packverify",
+  "name": "npm-testpack",
   "version": "1.0.0",
   "description": "Verifies that your package will work after it is published by running your unit tests in a special test folder.",
   "main": "main.js",
@@ -8,29 +8,31 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/qwertie/packverify.git"
+    "url": "git+https://github.com/qwertie/testpack.git"
   },
   "keywords": [
     "npm",
     "pack",
     "prepublish",
     "publish",
-    "verify",
     "test",
-    "check"
+    "check",
+    "verify"
   ],
   "author": "David Piepgrass",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/qwertie/packverify/issues"
+    "url": "https://github.com/qwertie/testpack/issues"
   },
-  "homepage": "https://github.com/qwertie/packverify#readme",
+  "homepage": "https://github.com/qwertie/testpack#readme",
   "dependencies": {
-    "@types/minimist": "^1.2.0",
-    "@types/node": "^10.5.2",
-    "minimist": "^1.2.0"
+    "@types/underscore": "^1.8.8",
+    "minimist": "^1.2.0",
+    "underscore": "^1.9.1"
   },
   "devDependencies": {
-    "ts-node": "^7.0.0"
+    "ts-node": "^7.0.0",
+    "@types/minimist": "^1.2.0",
+    "@types/node": "^10.5.2"
   }
 }

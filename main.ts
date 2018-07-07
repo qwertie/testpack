@@ -1,6 +1,6 @@
 import * as parseArgs from 'minimist';
 import * as path from 'path';
-import {refineArgs, packAndVerify} from './packverify';
+import {refineOptions, testPack} from './testpack';
 
 var aliases = {
   '?':"help", p:"package.json", o:"test-folder", s:"test-script",
@@ -10,7 +10,7 @@ var args = parseArgs(process.argv, {alias:aliases});
 Object.keys(aliases).forEach(a => delete args[a]);
 
 if (args.help) {
-  console.log(`Usage: ${path.basename(process.argv[0], 'exe')} ${path.basename(process.argv[1], 'js')} [Options] [<Test patterns>]
+  console.log(`Usage: testpack [Options] [<Test patterns>]
   Verifies that npm package is packaged properly by testing the packaged
   version against your unit tests in a special test folder.
   
@@ -74,15 +74,17 @@ if (args.help) {
         Prevents removal of package(s) from dependencies or devDependencies.
   --prepacked=file
         Instead of running \`npm pack\`, the specified tar.gz file is unpacked.
+        This option also prevents the deletion of the tar.gz file on exit.
   --show-json
-        Shows the JSON equivalent to the specified arguments, and quits.
+        Shows the JSON equivalent of the specified arguments, then quits.
+        You can put these settings in a "packtest" section of package.json.
   `);
 } else if (args['show-json']) {
-  console.log(JSON.stringify(refineArgs(args), undefined, 2));
+  delete args['show-json'];
+  console.log(JSON.stringify({ packtest: refineOptions(args) }, undefined, 2));
 } else {
   try {
-    args = 
-    packAndVerify(refineArgs(args));
+    console.log('NOT READY');
   } catch(err) {
     console.log("*** ERROR ***");
     console.log(err);
