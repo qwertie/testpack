@@ -4,6 +4,8 @@ import * as path from 'path';
 import * as process from 'process';
 import {isPrimitive, mkdirSyncRecursive, run} from './util';
 import * as _ from 'underscore';
+import * as glob from 'glob';
+import * as globmatch from 'minimatch';
 
 type PackageJson = {
   "name": string;
@@ -15,11 +17,13 @@ type PackageJson = {
 };
 
 interface Options {
-  "package.json-replace"?: any; // --package.json={...}
-  "package.json"?: any;         // --package.json=+{...}
-  "package.json-file"?: string; // file to load (generated file is always package.json)
+  "test-files": string[]; // globs
+  "ignore"?: string[]; // files not to be treated as tests
+  "packagejson-replace"?: any; // --package.json={...}
+  "packagejson"?: any;         // --package.json=+{...}
+  "packagejson-file"?: string; // file to load (generated file is always package.json)
   "replace-import"?: string[];
-  "regex"?: { exts:string[], regex:string, regexOptions:string };
+  "regex"?: { exts:string[], regex:string, regexOptions:string }[];
   "install"?: string[];
   "keep"?: string[];
   "test-folder"?: string;
@@ -38,13 +42,14 @@ export function testPack(opts: Options) {
   console.log(`========== testpack: running npm pack`);
   var tgzName = runNpmPack(pkg, opts);
   
-  var testFolder = opts["test-folder"] || '.packtest';
+  var testFolder = opts["test-folder"] = opts["test-folder"] || '.packtest';
   console.log(`========== testpack: preparing test folder: ${testFolder}`);
   transformPackageJson(pkg, opts);
   var isNew = mkdirSyncRecursive(testFolder);
   var newJson = JSON.stringify(pkg, undefined, 2);
   fs.writeFileSync(path.join(testFolder, "package.json"), newJson, 'utf8');
   
+  var originalDir = path.relative(testFolder, '.');
   process.chdir(testFolder);
   run("npm", ["install"]);
   for (let pkgName of opts.install || [])
@@ -52,10 +57,14 @@ export function testPack(opts: Options) {
   var tgzName2 = path.relative(testFolder, tgzName);
   run("npm", ["install", tgzName2]);
 
-  // 6. Copies test files (test*,*test.*,*tests.*,*test*/*) to the folder,
-  //    preserving the original directory structure.
+  var testFiles = getTestFiles(opts, originalDir)
+  console.log(`========== testpack: copying ${0} test files to ${testFolder}`);
+  copyFileTree(testFiles, originalDir, '.');
   // 7. Changes import/require commands in the tests according to --replace
+  for (var filename of testFiles)
+    transformImports(filename, filename, opts);
   // 8. Runs \`npm run test\` (or another script according to \`--test-script\`)
+  run("npm", ["run", opts["test-script"] || "test"]);
   // 9. Deletes node_modules in the test folder to avoid biasing future results
 }
 
@@ -63,9 +72,17 @@ export function testPack(opts: Options) {
  *  to the Options interface and performs type checking. */
 export function refineOptions(args: any): Options {
   var k: string;
-  expect(args[k = 'package.json-replace'] === undefined ||
+  if (!args[k = 'test-files'] && args._)
+    args[k] = args._;
+  if (args[k = 'test-files'] == null || args[k].length === 0)
+    args[k] = ["*test*/*", "test*", "*test.*", "*tests.*"];
+  else
+    maybeUpgradeToArrayOfString(args, k, false);
+  maybeUpgradeToArrayOfString(args, 'ignore', false);
+
+  expect(args[k = 'packagejson-replace'] === undefined ||
          args[k] instanceof Object, `${k} should be an object`);
-  if (!(args[k = 'package.json'] instanceof Object)) {
+  if (!(args[k = 'packagejson'] instanceof Object)) {
     if (maybeUpgradeToArrayOfString(args, k, false)) {
       var mergings = {}, replaces = {};
       for (let s of args[k] as string[]) {
@@ -74,38 +91,46 @@ export function refineOptions(args: any): Options {
         else
           replaces = Object.assign(replaces, evalToObject(s));
       }
-      args['package.json'] = mergings;
-      args['package.json-replace'] = replaces;
+      args['packagejson'] = mergings;
+      args['packagejson-replace'] = replaces;
     }
   }
-  expectType(args, 'package.json-file', 'string');
+  expectType(args, 'packagejson-file', 'string');
+
   if (args[k = 'replace-import'] !== undefined) {
     maybeUpgradeToArrayOfString(args, k, false);
     expect((args[k] as string[]).every(v => v.indexOf('=') > -1), 
       "Syntax error in replace-import: expected `=`");
   }
+
   if (args[k = 'regex'] !== undefined) {
-    console.log('line 88');
-    if (typeof args[k] === 'string') {
-      var regex = args[k] as string;
-      var i = 0, c;
-      while((c = regex.charAt(i)) >= 'a' && c <= 'z' || 
-            c >= 'A' && c <= 'Z' || c == ',')
-            i++;
-      var exts = regex.slice(0, i).split(',');
-      var end_i = regex.lastIndexOf(regex.charAt(i));
-      expect(i < regex.length - 1 && end_i > i, "syntax error in regex option");
-      args[k] = { exts, regex: regex.slice(i+1, end_i) };
-      var regexOptions = regex.slice(end_i + 1);
-      if (regexOptions.length > 0)
-        args[k].regexOptions = regexOptions;
+    if (typeof args[k] === 'string')
+      args[k] = [args[k]];
+    else
+      expect(Array.isArray(args[k]), `${k} should be an array`);
+    var regexes: any[] = args[k];
+    for (var r = 0; r < regexes.length; r++) {
+      var regex = regexes[r];
+      if (typeof regex === 'string') {
+        var i = 0, c;
+        while((c = regex.charAt(i)) >= 'a' && c <= 'z' || 
+              c >= 'A' && c <= 'Z' || c == ',')
+              i++;
+        var exts = regex.slice(0, i).split(',');
+        var end_i = regex.lastIndexOf(regex.charAt(i));
+        expect(i < regex.length - 1 && end_i > i, "syntax error in regex option");
+        regexes[r] = { exts, regex: regex.slice(i+1, end_i) };
+        if (end_i + 1 < regex.length)
+          regexes[r].regexOptions = regex.slice(end_i + 1);
+      }
+      expect(regex.exts !== undefined && regex.regex !== undefined, 
+        'regex option should contain "exts" and "regex" subkeys');
+      expectArrayOf(regex, 'exts', 'string');
+      expectType(regex, 'regex', 'string');
+      expectType(regex, 'regexOptions', 'string');
     }
-    expect('exts' in args[k] && 'regex' in args[k], 
-      'regex option should contain "exts" and "regex" subkeys');
-    expectArrayOf(args[k], 'exts', 'string');
-    expectType(args[k], 'regex', 'string');
-    expectType(args[k], 'regexOptions', 'string');
   }
+
   maybeUpgradeToArrayOfString(args, 'install', true);
   maybeUpgradeToArrayOfString(args, 'keep', true);
   expectType(args, 'test-folder', 'string');
@@ -148,7 +173,7 @@ export function refineOptions(args: any): Options {
 }
 
 export function readPackageJson(opts: Options): PackageJson {
-  var packageJson = opts["package.json-file"] || "package.json";
+  var packageJson = opts["packagejson-file"] || "package.json";
   // If package.json not found, try parent folders
   while (!fs.existsSync(packageJson)) {
     try {
@@ -177,7 +202,22 @@ function transformPackageJson(pkg: PackageJson, opts: Options)
 {
   pkg.testpack = opts;
 
-  var edits = opts['package.json'];
+  // Delete all dependencies except popular unit test frameworks
+  // and packages that the user whitelisted.
+  var whitelist = ["mocha", "jasmine", "jest", "qunit", "enzyme", "tape", "ava"];
+  if (opts.keep)
+    whitelist = whitelist.concat(opts.keep);
+  pkg.dependencies = filterToWhitelist(pkg.dependencies, whitelist);
+  pkg.devDependencies = filterToWhitelist(pkg.devDependencies, whitelist);
+  function filterToWhitelist(deps: any, whitelist: string[]) {
+    if (deps)
+      deps = _.pick(deps, (v:any,key:any) => {
+        return whitelist.some(v => globmatch(key, v));
+      });
+    return deps;
+  }
+
+  var edits = opts['packagejson'];
   if (edits !== undefined) {
     if (typeof edits === 'string') {
       if (edits.charAt(0)==='+') {
@@ -190,15 +230,6 @@ function transformPackageJson(pkg: PackageJson, opts: Options)
     } else
       merge(pkg, edits);
   }
-
-  // Delete all dependencies except popular unit test frameworks
-  // and packages that the user whitelisted.
-  var whitelist = ["mocha", "jasmine", "jest", "enzyme", "tape", "ava"];
-  if (opts.keep) whitelist = whitelist.concat(opts.keep);
-  if (pkg.dependencies)
-    pkg.dependencies = _.pick(pkg.dependencies, whitelist);
-  if (pkg.devDependencies)
-    pkg.devDependencies = _.pick(pkg.devDependencies, whitelist);
 }
 
 function runNpmPack(pkg: PackageJson, opts: Options): string {
@@ -211,6 +242,46 @@ function runNpmPack(pkg: PackageJson, opts: Options): string {
     throw `Expected npm pack to make ${pkgName} but it doesn't exist.`;
   return pkgName;
 }
+
+function getTestFiles(opts: Options, fromFolder?: string): string[] {
+  // Combine all inclusion patterns into one string, as glob requires
+  var includes = "{" + opts["test-files"].join(',') + "}";
+  return glob.sync(includes, {cwd: fromFolder, ignore: opts.ignore});
+}
+function copyFileTree(files: string[], fromFolder: string, toFolder: string)
+{
+  for (var file of files) {
+    var toFile = path.join(toFolder, file);
+    mkdirSyncRecursive(path.dirname(toFile));
+    fs.copyFileSync(path.join(fromFolder, file), toFile);
+  }
+}
+
+function transformImports(inputFile: string, outputFile: string, matchers: RegExp[])
+{
+  var file = fs.readFileSync(inputFile, 'utf8');
+  var lines = file.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    
+  }
+}
+
+var jsExts = ["js","mjs","ts","tsx"];
+var defaultRegexes = [
+  { exts: jsExts, regex: /require\s*(\s*"((?:[^\\"]|\\.)*)"\s*)'/ },
+  { exts: jsExts, regex: /require\s*(\s*'((?:[^\\']|\\.)*)'\s*)"/ },
+  { exts: jsExts, regex: 'require("((?:[^\\"]|\\.)*)")' },
+  { exts: jsExts, regex: 'require("((?:[^\\"]|\\.)*)")' },
+];
+function getMatchersFor(fileName: string, opts: Options)
+{
+  var ext = fileName.indexOf('.') > -1 ? path.extname(fileName) : fileName;
+  for (var regex of opts.regex || ) {
+  }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Lower-level functions
 
 function evalToObject(data: string) {
   if (data.charAt(0) !== '{')

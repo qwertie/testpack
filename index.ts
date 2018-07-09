@@ -1,12 +1,13 @@
 import * as parseArgs from 'minimist';
 import * as path from 'path';
 import {refineOptions, testPack} from './testpack';
+import * as glob from 'glob';
 
 var aliases = {
-  '?':"help", p:"package.json", o:"test-folder", s:"test-script",
-  r:"replace-import", replace:"replace-import", R:"rmdir"
+  '?':"help", p:"packagejson", o:"test-folder", s:"test-script",
+  r:"replace-import", replace:"replace-import", R:"rmdir", '!':"ignore"
 };
-var args = parseArgs(process.argv, {alias:aliases});
+var args = parseArgs(process.argv.slice(2), {alias:aliases});
 Object.keys(aliases).forEach(a => delete args[a]);
 
 if (args.help) {
@@ -14,9 +15,11 @@ if (args.help) {
   Verifies that npm package is packaged properly by testing the packaged
   version against your unit tests in a special test folder.
   
-  <Test patterns> are glob patterns used to recognize source files 
-  that are test-related and so should be copied to the new project. 
-  The default test patterns are \`test* *test.* *tests.* *test*/*\`
+  <Test patterns> are glob patterns used to recognize source files that are
+  test-related and so should be copied to the new project. The default test
+  patterns are \`test* *test.* *tests.* *test*/*\`. Note: the glob package
+  is used to match test patterns. It requires slash (/) as the path separator
+  even on Windows; backslashes escape "special" characters such as braces.
   
   1. Runs \`npm pack\` to create a preview copy of your package.
   2. Creates a test folder (default: .packverify) in which a new package.json
@@ -34,11 +37,11 @@ if (args.help) {
   9. Deletes node_modules in the test folder to avoid biasing future results
 
   Options:
-  -p, --package.json=key:value
+  -p, --packagejson=key:value
         Puts data into the new package.json file. The value is eval'd and
         so may be code. If the key already exists, its value is replaced.
         Use \`undefined\` to delete an existing value.
-  -p, --package.json=+key:value  
+  -p, --packagejson=+key:value  
         Merges data into the new package.json file. If the new value is a 
         primitive, it overwrites the old value. If the old value is a 
         primitive, it is treated as an array. If both are arrays, they are
@@ -78,13 +81,18 @@ if (args.help) {
   --show-json
         Shows the JSON equivalent of the specified arguments, then quits.
         You can put these settings in a "packtest" section of package.json.
+  -!, --ignore pattern
+        Ignores the specified files (glob pattern) when searching for tests.
   `);
 } else if (args['show-json']) {
   delete args['show-json'];
   console.log(JSON.stringify({ packtest: refineOptions(args) }, undefined, 2));
 } else {
   try {
-    console.log('NOT READY');
+    if (args._.length === 0)
+      args._ = ["*test*/*", "test*", "*test.*", "*tests.*"];
+    console.log(args);
+    console.log(glob.sync("{}", {nodir:true}));
   } catch(err) {
     console.log("*** ERROR ***");
     console.log(err);
