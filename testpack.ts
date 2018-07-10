@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import * as fs from 'fs';
+import * as fsextra from 'fs-extra';
 import * as path from 'path';
 import * as process from 'process';
-import {isPrimitive, mkdirSyncRecursive, run} from './util';
+import {isPrimitive, run} from './util';
 import * as _ from 'underscore';
 import * as glob from 'glob';
 import * as globmatch from 'minimatch';
@@ -15,15 +16,16 @@ type PackageJson = {
   "scripts"?: any;
   "testpack"?: any;
 };
+type ImportMatcher = { exts:string[], regex:string|RegExp, regexOptions?:string };
 
 interface Options {
-  "test-files": string[]; // globs
+  "test-files": string[]; // glob patterns
   "ignore"?: string[]; // files not to be treated as tests
   "packagejson-replace"?: any; // --package.json={...}
   "packagejson"?: any;         // --package.json=+{...}
   "packagejson-file"?: string; // file to load (generated file is always package.json)
-  "replace-import"?: string[];
-  "regex"?: { exts:string[], regex:string, regexOptions:string }[];
+  "replace-import"?: string[]; // /pat1/pat2/
+  "regex"?: ImportMatcher[];
   "install"?: string[];
   "keep"?: string[];
   "test-folder"?: string;
@@ -45,7 +47,7 @@ export function testPack(opts: Options) {
   var testFolder = opts["test-folder"] = opts["test-folder"] || '.packtest';
   console.log(`========== testpack: preparing test folder: ${testFolder}`);
   transformPackageJson(pkg, opts);
-  var isNew = mkdirSyncRecursive(testFolder);
+  fsextra.ensureDirSync(testFolder);
   var newJson = JSON.stringify(pkg, undefined, 2);
   fs.writeFileSync(path.join(testFolder, "package.json"), newJson, 'utf8');
   
@@ -58,14 +60,34 @@ export function testPack(opts: Options) {
   run("npm", ["install", tgzName2]);
 
   var testFiles = getTestFiles(opts, originalDir)
-  console.log(`========== testpack: copying ${0} test files to ${testFolder}`);
+  console.log(`========== testpack: copyediting ${0} test files in ${testFolder}`);
   copyFileTree(testFiles, originalDir, '.');
-  // 7. Changes import/require commands in the tests according to --replace
-  for (var filename of testFiles)
-    transformImports(filename, filename, opts);
-  // 8. Runs \`npm run test\` (or another script according to \`--test-script\`)
+  transformAllImports(testFiles, opts);
+  
+  console.log(`========== testpack: running tests`);
   run("npm", ["run", opts["test-script"] || "test"]);
-  // 9. Deletes node_modules in the test folder to avoid biasing future results
+  
+  process.chdir(originalDir);
+  var dirToRemove = opts.rmdir ? testFolder : path.join(testFolder, 'node_modules');
+  console.log(`========== testpack: deleting ${dirToRemove}`);
+  fsextra.remove(dirToRemove);
+}
+
+function transformAllImports(testFiles: string[], opts: Options) {
+  var replacements: [RegExp, string][] | undefined = undefined;
+  if (opts["replace-import"]) {
+    replacements = opts["replace-import"]!.map(v => {
+      var delim = v[v.length - 1];
+      var first = v.indexOf(delim);
+      var middle = v.indexOf(delim, first + 1);
+      return [new RegExp(v.slice(first + 1, middle)),
+      v.slice(middle + 1, v.length - 1)] as [RegExp, string];
+    });
+  }
+  for (var filename of testFiles) {
+    var matchers = getMatchersFor(filename, opts);
+    transformImports(filename, filename, matchers, opts["test-files"], replacements);
+  }
 }
 
 /** Converts args (produced by minimist or read from package.json)
@@ -99,8 +121,8 @@ export function refineOptions(args: any): Options {
 
   if (args[k = 'replace-import'] !== undefined) {
     maybeUpgradeToArrayOfString(args, k, false);
-    expect((args[k] as string[]).every(v => v.indexOf('=') > -1), 
-      "Syntax error in replace-import: expected `=`");
+    expect((args[k] as string[]).every(v => v[0] === v[v.length-1] && v.indexOf(v[0], 1) < v.length-1), 
+      "Syntax error in replace-import: expected three slashes/delimiters");
   }
 
   if (args[k = 'regex'] !== undefined) {
@@ -252,32 +274,71 @@ function copyFileTree(files: string[], fromFolder: string, toFolder: string)
 {
   for (var file of files) {
     var toFile = path.join(toFolder, file);
-    mkdirSyncRecursive(path.dirname(toFile));
+    fsextra.ensureDirSync(path.dirname(toFile));
     fs.copyFileSync(path.join(fromFolder, file), toFile);
   }
 }
 
-function transformImports(inputFile: string, outputFile: string, matchers: RegExp[])
+function transformImports(inputFile: string, outputFile: string, matchers: RegExp[], testPatterns: string[], replaceImports?: [RegExp,string][])
 {
   var file = fs.readFileSync(inputFile, 'utf8');
   var lines = file.split('\n');
-  for (var i = 0; i < lines.length; i++) {
-    
+  var changed = false;
+  for (var l = 0; l < lines.length; l++) {
+    for (var m = 0; m < matchers.length; m++) {
+      for (var i = 0; i < lines[l].length;) {
+        var match = lines[l].slice(i).match(matchers[m]);
+        if (match == null) break;
+        var importFn = match[1];
+        if (importFn !== undefined) {
+          if (replaceImports === undefined) {
+            // Default behavior: remove './' except if it appears to
+            // import a test file, in which case do nothing.
+            if (importFn.startsWith("./") || importFn.startsWith(".\\")) {
+              if (!testPatterns.some(tp => globmatch(importFn, tp)))
+                importFn = importFn.slice(2);
+            }
+          } else {
+            // Obey custom replacement patterns
+            replaceImports.forEach(([from, to]) => {
+              importFn = importFn.replace(from, to);
+            });
+          }
+          if (importFn !== match[1]) {
+            // A replacement was made... insert it into the original line
+            var iStart = i + match.index! + match[0].lastIndexOf(match[1]);
+            var iEnd = iStart + match[1].length;
+            lines[l] = lines[l].slice(0, iStart) + importFn + lines[l].slice(iEnd);
+            changed = true;
+            i = iEnd;
+          }
+        }
+      }
+    }
   }
+  fs.writeFileSync(outputFile, lines.join('\n'), 'utf8');
 }
 
-var jsExts = ["js","mjs","ts","tsx"];
-var defaultRegexes = [
-  { exts: jsExts, regex: /require\s*(\s*"((?:[^\\"]|\\.)*)"\s*)'/ },
-  { exts: jsExts, regex: /require\s*(\s*'((?:[^\\']|\\.)*)'\s*)"/ },
-  { exts: jsExts, regex: 'require("((?:[^\\"]|\\.)*)")' },
-  { exts: jsExts, regex: 'require("((?:[^\\"]|\\.)*)")' },
+var jsExts = ["js", "mjs", "ts", "tsx"];
+export var defaultRegexes: ImportMatcher[] = [
+  { exts: jsExts, regex: /require\s*\(\s*"((?:[^\\"]|\\.)*)"/ },
+  { exts: jsExts, regex: /require\s*\(\s*'((?:[^\\']|\\.)*)'/ },
+  { exts: jsExts, regex: /[a-zA-Z0-9_}]\s*from\s*"((?:[^\\"]|\\.)*)"/ },
+  { exts: jsExts, regex: /[a-zA-Z0-9_}]\s*from\s*'((?:[^\\"]|\\.)*)'/ },
 ];
-function getMatchersFor(fileName: string, opts: Options)
+export function getMatchersFor(fileName: string, opts: Options): RegExp[]
 {
   var ext = fileName.indexOf('.') > -1 ? path.extname(fileName) : fileName;
-  for (var regex of opts.regex || ) {
+  var results: RegExp[] = [];
+  for (var matcher of defaultRegexes.concat(opts.regex || [])) {
+    if (matcher.exts.indexOf(ext) > -1) {
+      if (matcher.regex instanceof RegExp)
+        results.push(matcher.regex);
+      else
+        results.push(new RegExp(matcher.regex, matcher.regexOptions));
+    }
   }
+  return results;
 }
 
 /////////////////////////////////////////////////////////////////////////////

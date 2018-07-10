@@ -52,19 +52,19 @@ if (args.help) {
           Out: \`{"a":1,"b":[7,8],"c":[3,4],"x":{"D":{"0":4,"two":2},"E":5}}\`
   -o, --test-folder=path
         Path to test folder. Created if necessary.
-  -r, --replace-import pat1=pat2
+  -r, --replace-import /pat1/pat2/
         Searches js/mjs/ts/tsx test files for require/import commands using 
-        glob pattern 1, replacing it with pattern 2. If --replace is not
-        used then all paths that start with \`./\` are replaced with a path
-        that does not start with \`./\`, except files that seem to be tests
-        according to --tests.
+        regex pattern 1, replacing it with pattern 2. If --replace-import is 
+        not used then all paths that start with \`./\` are replaced with a 
+        path that does not start with \`./\`, except files that seem to be 
+        tests according to --tests. UTF-8 encoding is assumed.
   --regex ext/regex/
-        For the purpose of --replace, files with the specified extension are
-        searched using this regular expression, and the first captured group
-        is treated as the filename to which --replace applies. For example, 
-        this built-in regex is used to match require commands that use 
-        double quotes:
-          --regex js/require("((?:[^\\"]|\\.)*)")/
+        For the purpose of modifying import/require commands, files with the
+        specified extension(s) are searched using this regular expression,
+        and the first captured group is treated as a filename that may need 
+        to be modified. For example, this built-in regex is used to match
+        require commands that use double quotes:
+          --regex js/require\s*\(\s*"((?:[^\\"]|\\.)*)"/
         You can specify multiple extensions separated by commas: \`js,mjs\`
   -R, --rmdir
         Remove entire test folder when done (by default, only the contents
