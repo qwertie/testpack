@@ -1,7 +1,6 @@
 // Install:
 // npm install --global jest babel-core typescript ts-jest
-import * as tp from "./npm-testpack";
-import * as misc from "./misc";
+import * as tp from "../src/npm-testpack";
 
 test('refineOptions 1', () => {
   var args = { 
@@ -94,6 +93,7 @@ test('refineOptions error handling', () => {
   expect(() => tp.refineOptions({ 'rmdir': 'maybe' })).toThrow(/rmdir/);
   expect(() => tp.refineOptions({ 'test-script': [] })).toThrow(/test-script/);
   expect(() => tp.refineOptions({ 'prepacked': ['blah'] })).toThrow(/prepacked/);
+  expect(() => tp.refineOptions({ 'delete-on-fail': 'YES' })).toThrow(/delete-on-fail/);
 });
 
 test('readPackageJson', () => {
@@ -123,7 +123,7 @@ test('transformPackageJson', () => {
     "keep": ['kept']
   });
   expect(pkg).toEqual({
-    "name": "foo", 
+    "name": "foo-test", 
     "version": "1.0.0",
     "dependencies": {"jest": "^23.0.0", "kept": "1.0.0"},
     "devDependencies": {"mocha": "^3.0.0"},
@@ -137,11 +137,15 @@ test('transformPackageJson', () => {
 });
 
 test('getTestFiles', () => {
-  expect(tp.getTestFiles({ 'test-files': [ "*test.*" ] }, '.'))
-    .toEqual(['unit.test.ts']);
+  var tf = tp.getTestFiles({ 'test-files': tp.defaultTestPatterns, nontest: [ "dist/*" ] }, '.');
+  console.log('==============================%%%%%%%%%%%');
+  expect(tf.sort()).toEqual(['tests/integration.test.ts', 'tests/unit.test.ts']);
 });
 
 test('transformImportsCore', () => {
+  // Ideally our regexes would detect and ignore strings, but it's hard.
+  // The \t characters ensure that this code isn't changed during 
+  // the Dress Rehearsal, when we're running testpack on this code.
   var lines = [
     "var fs = require\t('fs')",
     "var bar = require\t('./bar'), baz = require('./baz')",

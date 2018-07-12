@@ -3,7 +3,7 @@
 //           in ts-node, although it worked properly when compiled with tsc.
 import * as fs from 'fs';
 import * as path from 'path';
-import {spawnSync, SpawnSyncOptions} from 'child_process';
+import {spawnSync, SpawnSyncOptions, SpawnSyncReturns} from 'child_process';
 
 export function escapeRegExp(str: string) { // From Mozilla
   return str.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, "\\$1");
@@ -24,15 +24,21 @@ export function isPrimitive(x:any) {
  *   IIRC on Linux, expansion of wildcards is done by the shell, not
  *   by the target program. So don't use wildcard arguments here.
  */
-export function run(command: string, args: string[], options?: SpawnSyncOptions)
+export function run(command: string, args: string[], options?: SpawnSyncOptions): SpawnSyncReturns<Buffer>
 {
   // On Windows, {shell: true} is required for running batch files 
   // (shell scripts) and many Node.js tools are actually batch files.
   options = options || {cwd: '.', stdio: 'inherit', shell: true};
   var result = spawnSync(command, args, options);
+  return result; // Note: result.stdout==null when {stdio:'inherit'}
+}
+
+export function runAndThrowOnFail(command: string, args: string[], options?: SpawnSyncOptions): SpawnSyncReturns<Buffer>
+{
+  var result = run(command, args, options);
   if (result.signal) throw `${command} signal: ${result.signal}`;
   if (result.status) throw `${command} exited with code ${result.status}`;
-  return result; // Note: result.stdout==null when {stdio:'inherit'}
+  return result;
 }
 
 // Array.prototype.flat is not yet available
