@@ -45,7 +45,7 @@ function expect(test: boolean, err: string) {
  * @param opts Options
  */
 export function testPack(opts: Options) {
-  var pkg = readPackageJson(opts);
+  var pkg = readPackageJson(opts['packagejson-file']);
   opts = combineOptions(pkg, opts);
   if (opts.verbose)
     console.log(`========== testpack options: ${JSON.stringify(opts,null,2)}`);
