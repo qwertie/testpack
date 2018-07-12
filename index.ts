@@ -1,14 +1,14 @@
-import * as parseArgs from 'minimist';
-import * as path from 'path';
-import {refineOptions, testPack} from './testpack';
-import * as glob from 'glob';
+import parseArgs from 'minimist';
+import {refineOptions, testPack} from './npm-testpack';
 
+// Originally --packagejson was --package.json; unfortunately minimist
+// translates it to {"package":{"json":{...}}} not {"package.json":{...}}.
 var aliases = {
   '?':"help", p:"packagejson", o:"test-folder", s:"test-script",
-  r:"replace-import", replace:"replace-import", R:"rmdir", '!':"ignore"
+  r:"replace-import", replace:"replace-import", R:"rmdir", '!':"nontest"
 };
 var args = parseArgs(process.argv.slice(2), {alias:aliases});
-Object.keys(aliases).forEach(a => delete args[a]);
+Object.keys(aliases).forEach(a => delete args[a]); // delete aliases
 
 if (args.help) {
   console.log(`Usage: testpack [Options] [<Test patterns>]
@@ -53,11 +53,12 @@ if (args.help) {
   -o, --test-folder=path
         Path to test folder. Created if necessary.
   -r, --replace-import /pat1/pat2/
-        Searches js/mjs/ts/tsx test files for require/import commands using 
-        regex pattern 1, replacing it with pattern 2. If --replace-import is 
-        not used then all paths that start with \`./\` are replaced with a 
-        path that does not start with \`./\`, except files that seem to be 
-        tests according to --tests. UTF-8 encoding is assumed.
+        Searches js/mjs/ts/tsx test files for require/import filenames using 
+        regex pattern 1, replacing it with pattern 2 (pattern 2 can use $1
+        through $9 to re-emit captured strings). Replacements only affect
+        non-test files unless you add --replace-test-imports. If this option
+        is not used then the prefix is stripped from paths that start with 
+        \`./\` or \`./src/\` or \`../src/\`. UTF-8 encoding is assumed.
   --regex ext/regex/
         For the purpose of modifying import/require commands, files with the
         specified extension(s) are searched using this regular expression,
@@ -81,18 +82,21 @@ if (args.help) {
   --show-json
         Shows the JSON equivalent of the specified arguments, then quits.
         You can put these settings in a "packtest" section of package.json.
-  -!, --ignore pattern
+  -!, --nontest pattern
         Ignores the specified files (glob pattern) when searching for tests.
+  
+  Note: a shell may transform special characters before they reach packtest.
+  For this reason you may find it easier to configure it with a "testpack" 
+  section in package.json, e.g. -p=+two:2 --rmdir -- becomes 
+  "testpack": { "packagejson":{"two":2}, "rmdir":true,  }
   `);
 } else if (args['show-json']) {
+  console.log(args);
   delete args['show-json'];
   console.log(JSON.stringify({ packtest: refineOptions(args) }, undefined, 2));
 } else {
   try {
-    if (args._.length === 0)
-      args._ = ["*test*/*", "test*", "*test.*", "*tests.*"];
-    console.log(args);
-    console.log(glob.sync("{}", {nodir:true}));
+    var opts = refineOptions(args);
   } catch(err) {
     console.log("*** ERROR ***");
     console.log(err);
