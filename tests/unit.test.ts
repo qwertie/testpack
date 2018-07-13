@@ -16,8 +16,7 @@ test('refineOptions 1', () => {
   
   expect(opts).toEqual({
     'test-files': ["*test*"],
-    'packagejson': { },
-    'packagejson-replace': { 'five':5 },
+    'packagejson': 'five:5',
     'replace-import': ['#foo/(.*)#bar/$1#', '/a/b/'],
     "regex": [{
       "exts": [ "java" ],
@@ -31,7 +30,12 @@ test('refineOptions 1', () => {
   
 test('refineOptions 2', () => {
   var args = { _: [ '*test*' ],
-    packagejson: [ 'five:5', '+scripts:{test:\'jest\'}' ],
+    packagejson: [
+      'five:5',
+      'scripts:{test:\'jest\'}',
+      "{'house':{'attic':undefined,'garage':['powertools']}}",
+      '{ "house": { "attic": { "clean": true } } }',
+    ],
     'test-folder': '../packtest',
     'replace-import': '#foo/(.*)#bar/$1#',
     regex: 'cs#using\\s*(.*);#',
@@ -47,12 +51,12 @@ test('refineOptions 2', () => {
   
   expect(opts).toEqual({
     "test-files": ["*test*"],
-    "packagejson": {
-      "scripts": {
-        "test": "jest"
-      }
-    },
-    "packagejson-replace": { "five": 5 },
+    "packagejson": [
+      'five:5',
+      'scripts:{test:\'jest\'}',
+      "{'house':{'attic':undefined,'garage':['powertools']}}",
+      '{ "house": { "attic": { "clean": true } } }',
+    ],
     "replace-import": ["#foo/(.*)#bar/$1#"],
     "regex": [{
       "exts": [ "cs" ],
@@ -71,7 +75,11 @@ test('refineOptions 2', () => {
 
 test('refineOptions error handling', () => {
   expect(() => tp.refineOptions({ packagejson: 'garbage' })).toThrow(/packagejson/);
-  expect(() => tp.refineOptions({ packagejson: '+7' })).toThrow(/packagejson/);
+  expect(() => tp.refineOptions({ packagejson: '7' })).toThrow(/packagejson/);
+  expect(() => tp.refineOptions({ packagejson: '{two:2}' })).not.toThrow();
+  expect(() => tp.refineOptions({ packagejson: 123 })).toThrow(/packagejson.*object/);
+  expect(() => tp.refineOptions({ packagejson: [123] })).toThrow(/packagejson.*object/);
+  expect(() => tp.refineOptions({ packagejson: [{ two: 2 }] })).not.toThrow();
   expect(() => tp.refineOptions({ 'test-files': 123 })).toThrow(/test-files/);
   expect(() => tp.refineOptions({ 'nontest': [123] })).toThrow(/nontest/);
   expect(() => tp.refineOptions({ 'packagejson-file': {two:2} })).toThrow(/packagejson-file/);
@@ -111,15 +119,26 @@ test('combineOptions', () => {
 
  
 test('transformPackageJson', () => {
-  var pkg: tp.PackageJson = { 
+  var pkg = { 
     "name": "foo", 
     "version": "1.0.0",
     "dependencies": {"etc": "1.0.0", "jest": "^23.0.0", "kept": "1.0.0"},
     "devDependencies": {"mocha": "^3.0.0", "who-cares": "whatevs"},
-  };
+    "whatever": true,
+    "house": { "attic": { "worthless": true, "garbage": true }, 
+               "garage": [ "car", "bike" ] }
+  } as tp.PackageJson;
   pkg = tp.transformPackageJson(pkg, { 
     "test-files": tp.defaultTestPatterns,
-    "packagejson": {two:2},
+    "packagejson": [
+      { two:2 }, 
+      // Delete house.attic, then add new stuff in a separate command
+      { "house": { "attic": undefined, "garage": ["power tools"] } },
+      { "house": { "attic": { "clean": true } },
+        "testpack": undefined,
+        "whatever": undefined
+      }
+    ],
     "keep": ['kept']
   });
   expect(pkg).toEqual({
@@ -128,17 +147,15 @@ test('transformPackageJson', () => {
     "dependencies": {"jest": "^23.0.0", "kept": "1.0.0"},
     "devDependencies": {"mocha": "^3.0.0"},
     "two": 2,
-    "testpack": {
-      "test-files": tp.defaultTestPatterns,
-      "packagejson": {two:2},
-      "keep": ['kept']
-    }
+    "whatever": undefined,
+    "house": { "attic": { "clean": true }, 
+               "garage": [ "car", "bike", "power tools" ] },
+    "testpack": undefined,
   });
 });
 
 test('getTestFiles', () => {
   var tf = tp.getTestFiles({ 'test-files': tp.defaultTestPatterns, nontest: [ "dist/*" ] }, '.');
-  console.log('==============================%%%%%%%%%%%');
   expect(tf.sort()).toEqual(['tests/integration.test.ts', 'tests/unit.test.ts']);
 });
 

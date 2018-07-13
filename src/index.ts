@@ -23,11 +23,7 @@ if (args.help) {
   even on Windows; backslashes escape "special" characters such as braces.
   
   Options:
-  -p, --packagejson=key:value
-        Puts data into the new package.json file. The value is eval'd and
-        so may be code. If the key already exists, its value is replaced.
-        Use \`undefined\` to delete an existing value.
-  -p, --packagejson=+key:value  
+  -p, --packagejson=key:value  
         Merges data into the new package.json file. If the new value is a 
         primitive, it overwrites the old value. If the old value is a 
         primitive, it is treated as an array. If both are arrays, they are
@@ -36,6 +32,8 @@ if (args.help) {
           Old value: \`{"a":["hi"], "b":7, "c":[3], "x":{"D":4}}\`
           New value: \`{"a":1,"b":[8],"c":[4],"x":{"D":{"two":2},"E":5}}\`
           Out: \`{"a":1,"b":[7,8],"c":[3,4],"x":{"D":{"0":4,"two":2},"E":5}}\`
+        You can use \`undefined\` to delete an existing value, e.g.
+          --packagejson=testpack:undefined
   -o, --test-folder=path
         Path to test folder. Created if necessary.
   -r, --replace-import /pat1/pat2/

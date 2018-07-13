@@ -36,8 +36,8 @@ export function run(command: string, args: string[], options?: SpawnSyncOptions)
 export function runAndThrowOnFail(command: string, args: string[], options?: SpawnSyncOptions): SpawnSyncReturns<Buffer>
 {
   var result = run(command, args, options);
-  if (result.signal) throw `${command} signal: ${result.signal}`;
-  if (result.status) throw `${command} exited with code ${result.status}`;
+  if (result.signal) throw new Error(`${command} signal: ${result.signal}`);
+  if (result.status) throw new Error(`${command} exited with code ${result.status}`);
   return result;
 }
 
