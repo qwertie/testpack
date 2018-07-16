@@ -102,6 +102,7 @@ export function testPack(opts: Options): SpawnSyncReturns<Buffer>
       console.log(`============ npm install ${tgzName2}`);
     runAndThrowOnFail("npm", ["install", "--no-save", tgzName2]);
 
+    opts.nontest = (opts.nontest || []).concat(tgzName);
     var testFiles = getTestFiles(opts, originalDir)
     if (opts.verbose)
       console.log("============ copying " + JSON.stringify(testFiles));

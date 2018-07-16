@@ -1,8 +1,8 @@
 {
-  "name": "npm-testpack",
-  "version": "1.0.0",
+  "name": "testpack-cli",
+  "version": "1.0.1",
   "description": "Verifies that your package will work after it is published by running your unit tests in a special test folder.",
-  "main": "dist/npm-testpack.js",
+  "main": "dist/testpack-cli.js",
   "scripts": {
     "test": "jest",
     "prepare": "tsc",
@@ -53,7 +53,7 @@
   ],
   "bin": {
     "testpack": "dist/index.js",
-    "npm-testpack": "dist/index.js"
+    "testpack-cli": "dist/index.js"
   },
   "jest-comment": [
     "We must include js in moduleFileExtensions, otherwise the following error happens:",

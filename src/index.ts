@@ -1,5 +1,5 @@
 import parseArgs from 'minimist';
-import {refineOptions, testPack} from './npm-testpack';
+import {refineOptions, testPack} from './testpack-cli';
 
 // Originally --packagejson was --package.json; unfortunately minimist
 // translates it to {"package":{"json":{...}}} not {"package.json":{...}}.

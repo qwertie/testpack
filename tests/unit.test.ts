@@ -1,6 +1,6 @@
 // Install:
 // npm install --global jest babel-core typescript ts-jest
-import * as tp from "../src/npm-testpack";
+import * as tp from "../src/testpack-cli";
 
 test('refineOptions 1', () => {
   var args = { 

@@ -1,4 +1,4 @@
-npm-testpack: Test your package before publishing
+testpack: Test your package before publishing
 =================================================
 
 Usage: `testpack [Options] [<Test patterns>]`
@@ -97,7 +97,7 @@ Options
 --prepacked=file
       Skips running `npm pack` and unpacks the specified file.
 --verbose
-      Emit more text describing what npm-testpack is doing
+      Emit more text describing what testpack is doing
 --show-json
       Shows the JSON equivalent of the specified arguments, then quits.
       You can put these settings in a "testpack" section of package.json.
@@ -121,30 +121,30 @@ is equivalent to `--test-script=foo --verbose`.
 How to use it
 -------------
 
-1. Prepare to your package for publishing as you normally would ([instructions](http://typescript-react-primer.loyc.net/publish-npm-package.html))
-2. In a terminal: `npm install --save-dev --global npm-testpack`
+1. Prepare to your package for publishing as you normally would ([see also](http://typescript-react-primer.loyc.net/publish-npm-package.html))
+2. In a terminal: `npm install --save-dev --global testpack-cli`
 3. Run it with: `testpack`
-4. Run `npm publish` once it all works.
-5. To combine steps 4 and 5, use a script like `npm run safePublish`
+4. Run `npm publish` once your tests pass.
+5. To combine steps 4 and 5, use a script like `npm run safePublish` :
 
-      "scripts": {
-        "safePublish": "testpack && npm publish",
-        ...
-      }
+        "scripts": {
+          "safePublish": "testpack && npm publish",
+          ...
+        }
 
 If your package is a TypeScript project, make sure that your tests in the test folder are importing the compiled JavaScript version, because your end-users might not be using TypeScript. One way to guarantee this is to exclude all .ts files from your package (if you do that, be sure source maps are disabled in your tsconfig.json.) Your tests should still be written in TypeScript to make sure your d.ts files work; use `"declaration": true` in tsconfig.json so they can access type information.
 
-npm-testpack versus package-preview
+testpack-cli versus package-preview
 -----------------------------------
 
-I created npm-testpack because I wasn't happy with package-preview. Package-preview _does not_ create a special test folder and it _cannot_ edit the `import`/`require` commands in your source files. Instead, package-preview seems to be designed with the assumption that it will _always_ run before your tests. However, your package may need to be built (with Babel or TypeScript) before it is packaged, and package-preview installs it with a _separate copy_ of all the dependencies of your package. This is usually a slow process - a process you don't want to run _every time_ you run your unit tests.
+I created testpack because I wasn't happy with package-preview. Package-preview _does not_ create a special test folder and it _cannot_ edit the `import`/`require` commands in your source files. Instead, package-preview seems to be designed with the assumption that it will _always_ run before your tests. However, your package may need to be built (with Babel or TypeScript) before it is packaged, and package-preview installs it with a _separate copy_ of all the dependencies of your package. This is usually a slow process - a process you don't want to run _every time_ you run your unit tests.
 
 For example, I wrote [a very simple package](https://www.npmjs.com/package/simplertime) whose unit tests took 1 second. Once I added package-preview, I needed 18 seconds to run package-preview before the unit tests could start.
 
 Unfortunately, I couldn't find any way to import a module from *node_modules* if the path started with `./` - that prefix seems to be treated as proof that it's not in *node_modules*. Likewise, I couldn't find any way import a module from the current directory if it **did not** start with `./`. In normal JavaScript you could try using environment variables to figure out whether you need to use `.` or not, e.g. `require(process.env.TESTPACK ? "mymodule" : "./index")`. However if you are using TypeScript or `import` statements, this is not possible.
 
-Thus, the purpose of `npm-testpack` is to avoid slowing down the _normal_ unit test process when you are _not about to publish_. Your tests can import a local copy of your code from `./` or `../src/` so they run quickly. When you're ready to publish, you use the slower `npm-testpack` process to create a special-purpose test environment with modified imports.
+Thus, the purpose of `testpack` is to avoid slowing down the _normal_ unit test process when you are _not about to publish_. Your tests can import a local copy of your code from `./` or `../src/` so they run quickly. When you're ready to publish, you use the slower `testpack` process to create a special-purpose test environment with modified imports.
 
 **Note:** I bet one of you JavaScript wizards knows how I could have avoided all this trouble with `./`. TypeScript users might think that [TypeScript aliases](https://stackoverflow.com/a/38677886/22820) could potentially solve this problem, but they can't because they are compile-time only. That is, if you tell TypeScript that `./A` is an alias for `B`, then TypeScript loads `B` for type checking but it generates code that still refers to `./A`! And [ts-node inherits this problem](https://github.com/TypeStrong/ts-node/issues/138); thus if you are writing code for the command line / Node.js, aliases don't seem to help at all.
 
-Package-preview does have one special virtue: it uses `pnpm` to isolate the packed package (i.e. the almost-published tgz) from any other packages installed in the same project that are _not_ declared as dependencies in the packed package. npm-testpack doesn't have as much isolation, e.g. it keeps unit test frameworks. So, suppose that your packed package tries to use a dependency X but it doesn't declare the dependency in package.json like it should. If your unit test framework also uses dependency X, your code may still work when it should actually break. I apologize for that but I don't have time to implement fancier isolation. Perhaps someone will make a pull request?
+Package-preview does have one special virtue: it uses `pnpm` to isolate the packed package (i.e. the almost-published tgz) from any other packages installed in the same project that are _not_ declared as dependencies in the packed package. Testpack doesn't have as much isolation, e.g. it keeps unit test frameworks. So, suppose that your packed package tries to use a dependency X but it doesn't declare the dependency in package.json like it should. If your unit test framework also uses dependency X, your code may still work when it should actually break. I apologize for that but I don't have time to implement fancier isolation. Perhaps someone will make a pull request?

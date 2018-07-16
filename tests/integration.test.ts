@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as tp from "../src/npm-testpack";
+import * as tp from "../src/testpack-cli";
 
 // This test changes ./yes to yes to prevent recursive operation
 var insideTestFolder = './yes';
