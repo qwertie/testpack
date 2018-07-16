@@ -4,8 +4,8 @@ import {refineOptions, testPack} from './npm-testpack';
 // Originally --packagejson was --package.json; unfortunately minimist
 // translates it to {"package":{"json":{...}}} not {"package.json":{...}}.
 var aliases = {
-  '?':"help", p:"packagejson", o:"test-folder", s:"test-script",
-  r:"replace-import", replace:"replace-import", R:"rmdir", '!':"nontest"
+  '?':"help", p:"packagejson", o:"test-folder", s:"test-script", v:"verbose",
+  r:"replace-import", replace:"replace-import", R:"rmdir", '!':"nontest",
 };
 var args = parseArgs(process.argv.slice(2), {alias:aliases});
 Object.keys(aliases).forEach(a => delete args[a]); // delete aliases
@@ -18,12 +18,17 @@ if (args.help) {
     
   <Test patterns> are glob patterns used to recognize source files that are
   test-related and so should be copied to the new project. The default test
-  patterns are \`test* *test.* *tests.* *test*/**\`. Note: the glob package
-  is used to match test patterns. It requires slash (/) as the path separator
-  even on Windows; backslashes escape "special" characters such as braces.
+  patterns are \`test* *test.* *tests.* *test*/** tsconfig.json\`. 
+  Note: the glob package is used to match test patterns. It requires slash 
+  (/) as the path separator even on Windows; backslashes escape "special" 
+  characters such as braces.
   
   Options:
-  -p, --packagejson=key:value  
+  --dirty
+        The contents of the test folder are normally deleted at the start.
+        This option skips the deletion step, potentially leaving extra files
+        in the test folder (also: runs faster npm ci instead of npm install)
+  -p, --packagejson=key:value, --packagejson={...}
         Merges data into the new package.json file. If the new value is a 
         primitive, it overwrites the old value. If the old value is a 
         primitive, it is treated as an array. If both are arrays, they are
@@ -33,7 +38,7 @@ if (args.help) {
           New value: \`{"a":1,"b":[8],"c":[4],"x":{"D":{"two":2},"E":5}}\`
           Out: \`{"a":1,"b":[7,8],"c":[3,4],"x":{"D":{"0":4,"two":2},"E":5}}\`
         You can use \`undefined\` to delete an existing value, e.g.
-          --packagejson=testpack:undefined
+          --packagejson={testpack:undefined,repository:undefined}
   -o, --test-folder=path
         Path to test folder. Created if necessary.
   -r, --replace-import /pat1/pat2/
@@ -54,6 +59,8 @@ if (args.help) {
   -R, --rmdir
         Remove entire test folder when done (by default, only the contents
         of node_modules and the tgz from \`npm pack\` is deleted.)
+  --delete-on-fail
+        Delete the test folder & tgz even when tests fail.
   -s, --test-script=name
         Name of test script to run with \`npm run\` (default: \`test\`).
   --install package
@@ -71,8 +78,6 @@ if (args.help) {
         You can put these settings in a "testpack" section of package.json.
   -!, --nontest pattern
         Ignores the specified files (glob pattern) when searching for tests.
-  --delete-on-fail
-        Causes the test folder / node_modules to be deleted if tests fail.
   `);
 } else if (args['show-json']) {
   delete args['show-json'];

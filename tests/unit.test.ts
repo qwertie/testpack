@@ -99,6 +99,7 @@ test('refineOptions error handling', () => {
   expect(() => tp.refineOptions({ 'keep': ['foo',123] })).toThrow(/keep/);
   expect(() => tp.refineOptions({ 'test-folder': ['foo'] })).toThrow(/test-folder/);
   expect(() => tp.refineOptions({ 'rmdir': 'maybe' })).toThrow(/rmdir/);
+  expect(() => tp.refineOptions({ 'dirty': 'sure!' })).toThrow(/dirty/);
   expect(() => tp.refineOptions({ 'test-script': [] })).toThrow(/test-script/);
   expect(() => tp.refineOptions({ 'prepacked': ['blah'] })).toThrow(/prepacked/);
   expect(() => tp.refineOptions({ 'delete-on-fail': 'YES' })).toThrow(/delete-on-fail/);
@@ -117,7 +118,14 @@ test('combineOptions', () => {
                   "test-files": tp.defaultTestPatterns });
 });
 
- 
+test('merge', () => {
+  expect(tp.merge(
+    {"a":["hi"], "b":7,    "c":[3],  "x":{"D":4}}, 
+    {"a":1,      "b":[8],  "c":[4],  "x":{"D":{"two":2},"E":5}})).toEqual(
+      {"a":1,    "b":[7,8],"c":[3,4],"x":{"D":{"0":4,"two":2},"E":5}}
+  );
+});
+
 test('transformPackageJson', () => {
   var pkg = { 
     "name": "foo", 
@@ -155,8 +163,13 @@ test('transformPackageJson', () => {
 });
 
 test('getTestFiles', () => {
-  var tf = tp.getTestFiles({ 'test-files': tp.defaultTestPatterns, nontest: [ "dist/*" ] }, '.');
-  expect(tf.sort()).toEqual(['tests/integration.test.ts', 'tests/unit.test.ts']);
+  var tf = tp.getTestFiles({ 
+    'test-files': tp.defaultTestPatterns, 
+    nontest: [ "dist/*" ], 
+    "test-folder": "-" }, '.');
+  expect(tf.sort()).toEqual([
+    'tests/integration.test.ts', 'tests/unit.test.ts', 'tsconfig.json'
+  ]);
 });
 
 test('transformImportsCore', () => {
