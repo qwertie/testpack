@@ -1,6 +1,6 @@
 {
   "name": "testpack-cli",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "Verifies that your package will work after it is published by running your unit tests in a special test folder.",
   "main": "dist/testpack-cli.js",
   "scripts": {
@@ -52,8 +52,8 @@
     "readme.md"
   ],
   "bin": {
-    "testpack": "dist/index.js",
-    "testpack-cli": "dist/index.js"
+    "testpack": "./dist/index.js",
+    "testpack-cli": "./dist/index.js"
   },
   "jest-comment": [
     "We must include js in moduleFileExtensions, otherwise the following error happens:",
@@ -87,7 +87,7 @@
     "packagejson": {
       "scripts": { 
         "fix-ts-jest": "mkdir src && echo \"//required for ts-jest to workaround issue #618\" > src/dummy.ts || cd .",
-        "test": "npm run fix-ts-jest && jest"
+        "test": "npm run fix-ts-jest && jest && testpack --show-json"
       }
     }
   }

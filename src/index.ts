@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import parseArgs from 'minimist';
 import {refineOptions, testPack} from './testpack-cli';
 

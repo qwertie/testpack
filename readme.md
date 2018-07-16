@@ -132,6 +132,8 @@ How to use it
           ...
         }
 
+If your package includes commands in `"bin"` in package.json, npm has an [undocumented requirement for a shebang](https://npm.community/t/making-a-command-for-a-package-bin/628). Consider adding some sort of test to make sure your installed command can be invoked ([create an issue](https://github.com/qwertie/testpack/issues) if you want advice).
+
 If your package is a TypeScript project, make sure that your tests in the test folder are importing the compiled JavaScript version, because your end-users might not be using TypeScript. One way to guarantee this is to exclude all .ts files from your package (if you do that, be sure source maps are disabled in your tsconfig.json.) Your tests should still be written in TypeScript to make sure your d.ts files work; use `"declaration": true` in tsconfig.json so they can access type information.
 
 testpack-cli versus package-preview
