@@ -13,9 +13,9 @@ Object.keys(aliases).forEach(a => delete args[a]); // delete aliases
 
 if (args.help) {
   console.log(`Usage: testpack [Options] [<Test patterns>]
-  Attempts to verify that your npm package is set up properly by testing the 
-  packaged version against your unit tests in a special test folder with its
-  own custom package.json file.
+  Attempts to verify that your npm package is set up properly by installing
+  the packaged version in a special test folder with its own custom 
+  package.json file, then running a copy of your unit tests against it.
     
   <Test patterns> are glob patterns used to recognize source files that are
   test-related and so should be copied to the new project. The default test

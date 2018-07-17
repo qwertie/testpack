@@ -1,11 +1,11 @@
 testpack: Test your package before publishing
 =================================================
 
-Usage: `testpack [Options] [<Test patterns>]`
+Testpack attempts to verify that your npm package is set up properly by 
+installing the packaged version in a special test folder with its own 
+custom package.json file, and running a copy of your unit tests against it.
 
-Attempts to verify that your npm package is set up properly by installing
-the packaged version against your unit tests in a special test folder with 
-its own custom package.json file.
+**Usage:** `testpack [Options] [<Test patterns>]`
 
 `<Test patterns>` are glob patterns used to recognize source files that are
 test-related and so should be copied to the new project. The default test
@@ -18,7 +18,7 @@ Here's what it does:
 
 1. It runs `npm pack` to create a preview copy of your package.
 2. It creates a test folder. By default the folder is *../YPN-testpack*
-   where *YPN* is your package's name, and if the test folder already 
+   where *YPN* is Your Package's Name, and if the test folder already 
    exists, its contents are deleted. You can use `--test-folder` to 
    change the folder's path and name.
 3. In the test folder, a new package.json file derived from your existing 
