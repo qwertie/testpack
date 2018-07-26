@@ -91,6 +91,8 @@ if (args.help) {
         You can put these settings in a "testpack" section of package.json.
   -!, --nontest pattern
         Ignores the specified files (glob pattern) when searching for tests.
+  -v, --verbose
+        Emits more text describing what testpack is doing.
   `);
 } else if (args['show-json']) {
   delete args['show-json'];

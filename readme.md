@@ -111,13 +111,13 @@ Options
       of the tar.gz file on exit.
 --prepacked=file
       Skips running `npm pack` and unpacks the specified file.
---verbose
-      Emit more text describing what testpack is doing
 --show-json
       Shows the JSON equivalent of the specified arguments, then quits.
       You can put these settings in a "testpack" section of package.json.
 -!, --nontest pattern
       Ignores the specified files (glob pattern) when searching for tests.
+-v, --verbose
+      Emits more text describing what testpack is doing.
 ~~~
 
 **Caution:** your shell may transform special characters before they reach 
@@ -138,7 +138,7 @@ How to use testpack
 
 1. Prepare to your package for publishing as you normally would ([see also](http://typescript-react-primer.loyc.net/publish-npm-package.html))
 2. In a terminal: `npm install --save-dev --global testpack-cli`
-3. Run it with: `testpack`
+3. Run it with: `testpack` (add `--verbose` for more detail)
 4. Run `npm publish` once your tests pass.
 5. To combine steps 4 and 5, use a script like `npm run safePublish` :
 
