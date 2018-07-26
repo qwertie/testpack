@@ -1,6 +1,6 @@
 // Install:
 // npm install --global jest babel-core typescript ts-jest
-import * as tp from "../src/testpack-cli";
+import * as tp from "..";
 
 test('refineOptions 1', () => {
   var args = { 
@@ -165,7 +165,7 @@ test('transformPackageJson', () => {
 test('getTestFiles', () => {
   var tf = tp.getTestFiles({ 
     'test-files': tp.defaultTestPatterns, 
-    nontest: [ "dist/*" ], 
+    nontest: [ "dist/*", "*.tgz" ], 
     "test-folder": "-" }, '.');
   expect(tf.sort()).toEqual([
     'tests/integration.test.ts', 'tests/unit.test.ts', 'tsconfig.json'
@@ -178,24 +178,25 @@ test('transformImportsCore', () => {
   // the Dress Rehearsal, when we're running testpack on this code.
   var lines = [
     "var fs = require\t('fs')",
-    "var bar = require\t('./bar'), baz = require('./baz')",
-    'import * as foo from\t"../src/foo"',
+    "var bar = require\t('./bar'), baz = require(\t'../baz')",
+    'import * as foo from\t"."',
     'import * as foot from\t"./foo-test"',
     'var data = require\t("./__test__/file.xml")',
     'var data = require\t(".\\src\\file.xml")',
     "the_end"
   ];
   var opts = {'test-files': tp.defaultTestPatterns};
-  var matchers = tp.getMatchersFor("example.js", opts);
+  var helper = new tp.ImportTransformer(opts, "mypackage");
+  var matchers = helper.getMatchersFor("example.js");
   expect(matchers.length).toBeGreaterThan(1);
-  tp.transformImportsCore(lines, matchers, opts);
+  helper.transformImportsCore(lines, matchers);
   expect(lines).toEqual([
     "var fs = require\t('fs')",
-    "var bar = require\t('bar'), baz = require('baz')",
-    'import * as foo from\t"foo"',
+    "var bar = require\t('mypackage/bar'), baz = require(\t'mypackage/baz')",
+    'import * as foo from\t"mypackage"',
     'import * as foot from\t"./foo-test"',
     'var data = require\t("./__test__/file.xml")',
-    'var data = require\t("file.xml")',
+    'var data = require\t("mypackage\\src\\file.xml")',
     "the_end"
   ]);
 });

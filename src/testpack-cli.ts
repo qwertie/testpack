@@ -7,7 +7,7 @@ import * as glob from 'glob';
 import * as _ from 'underscore';
 import globmatch from 'minimatch';
 import {isPrimitive, run, runAndThrowOnFail, flatten} from './misc';
-import { SpawnSyncReturns } from 'child_process';
+import { SpawnSyncReturns, execSync } from 'child_process';
 
 export type PackageJson = {
   "name"?: string;
@@ -34,6 +34,8 @@ export interface Options {
   "test-folder"?: string;
   "rmdir"?: boolean;
   "dirty"?: boolean;
+  "setup-command"?: string;  // A command to run instead of "npm install".
+  "noinstall"?: boolean;
   "test-script"?: string;
   "verbose"?: boolean;
   "delete-on-fail"?: boolean; // Delete tgz and test folder when npm test fails?
@@ -53,7 +55,8 @@ export function testPack(opts: Options): SpawnSyncReturns<Buffer>
   opts = combineOptions(pkg, opts);
   if (opts.verbose)
     console.log(`============ testpack options: ${JSON.stringify(opts,null,2)}`);
-  var testFolder = opts["test-folder"] || path.join('..', (pkg.name || 'untitled') + '-testpack');
+  var pkgName = pkg.name || 'untitled';
+  var testFolder = opts["test-folder"] || path.join('..', pkgName + '-testpack');
   
   // Since we plan to delete the test folder, let's make sure it's not the 
   // current folder or its parent folder.
@@ -91,10 +94,15 @@ export function testPack(opts: Options): SpawnSyncReturns<Buffer>
     opts["test-folder"] = testFolder;
 
     if (opts.verbose)
-      console.log("============ installing packages with `npm install`");
+      console.log(`============ installing packages with \`${opts["setup-command"] || "npm install"}\``);
     var installStatus = 0;
-    if (!(fs.existsSync("package-lock.json") && run("npm", ["ci"]).status != 0))
-      runAndThrowOnFail("npm", ["install"]);
+    if (opts["setup-command"] !== undefined) {
+      if (opts["setup-command"] !== "")
+        execSync(opts["setup-command"]!, {cwd: '.', stdio: 'inherit'});
+    } else {
+      if (!(fs.existsSync("package-lock.json") && run("npm", ["ci"]).status != 0))
+        runAndThrowOnFail("npm", ["install"]);
+    }
     for (let pkgName of opts.install || [])
       runAndThrowOnFail("npm", ["install", "--save-dev", pkgName]);
     var tgzName2 = path.join(originalDir, tgzName);
@@ -107,7 +115,7 @@ export function testPack(opts: Options): SpawnSyncReturns<Buffer>
     if (opts.verbose)
       console.log("============ copying " + JSON.stringify(testFiles));
     copyFileTree(testFiles, originalDir, '.');
-    var editCount = transformAllImports(testFiles, opts);
+    var editCount = new ImportTransformer(opts, pkgName).transformAllImports(testFiles);
     console.log(`========== testpack: ${testFiles.length} test files copied to ${testFolder}, ${editCount} changed`);
     
     var script = opts["test-script"] || "test";
@@ -218,6 +226,7 @@ export function refineOptions(args: any): Options {
   expectType(args, 'test-folder', 'string');
   expectType(args, 'rmdir', 'boolean');
   expectType(args, 'dirty', 'boolean');
+  expectType(args, 'setup-command', 'string');
   expectType(args, 'test-script', 'string');
   expectType(args, 'delete-on-fail', 'boolean');
   if (args[k = 'prepacked'] !== undefined) {
@@ -374,134 +383,149 @@ export function copyFileTree(files: string[], fromFolder: string, toFolder: stri
   }
 }
 
-/** Reads a set of test files and scans it for import/require commands, 
- *  performing replacements on those.
- *  @param opts  opts.regex (combined with defaultRegexes) specifies how
- *         to find import strings, and opts['replace-import'] controls
- *         replacement patterns. Files that appear to be test files
- *         (opts['test-files']) are normally left unchanged.
- */
-export function transformAllImports(testFiles: string[], opts: Options) {
-  var replacements = getReplacementPairs(opts["replace-import"]);
-  var editCount = 0;
-  for (var filename of testFiles) {
-    if (transformImports(filename, filename, opts, replacements))
-      editCount++;
-  }
-  return editCount;
-}
-
-function transformImports(inputFile: string, outputFile: string, opts: Options, replacementPairs?: [RegExp,string][])
+/** Helper class for transforming import/require commands */
+export class ImportTransformer
 {
-  var matchers = getMatchersFor(inputFile, opts);
-  if (matchers.length > 0) {
-    var file = fs.readFileSync(inputFile, 'utf8');
-    var lines = file.split('\n');
-    if (transformImportsCore(lines, matchers, opts, replacementPairs)) {
-      fs.writeFileSync(outputFile, lines.join('\n'), 'utf8');
-      return true;
+  replacementPairs: [RegExp,string][];
+  constructor(public opts: Options, public packageName: string) {
+    this.replacementPairs = ImportTransformer.getReplacementPairs(packageName, opts["replace-import"]);
+  }
+
+  /** Reads a set of test files and scans it for import/require commands, 
+   *  performing replacements on those.
+   *  @param opts  opts.regex (combined with defaultRegexes) specifies how
+   *         to find import strings, and opts['replace-import'] controls
+   *         replacement patterns. Files that appear to be test files
+   *         (opts['test-files']) are normally left unchanged.
+   */
+  transformAllImports(testFiles: string[]) {
+    var editCount = 0;
+    for (var filename of testFiles) {
+      if (this.transformImports(filename, filename))
+        editCount++;
     }
+    return editCount;
   }
-  return false;
-}
 
-/** Scans a test file's lines for import/require commands via regex,
- *  performing replacements on those. Regexes are imperfect but save
- *  us the trouble of importing some huge JS/TS parser (and also allow
- *  users to support languages other than JS/TS.)
- *  @param matchers  Regular expressions used to locate import/require.
- *         First capture group must be the filename. Don't use "g" option.
- *  @param opts  opts.regex (combined with defaultRegexes) specifies how
- *         to find import strings, and opts['replace-import'] controls
- *         replacement patterns. Files that appear to be test files
- *         (opts['test-files'] except opts.nontest) are left unchanged 
- *         unless opts["replace-test-imports"] is true.
- *  @param replacementPairs  optional: cached interpretation of 
- *         opts['replace-import']
- */
-export function transformImportsCore(lines: string[], matchers: RegExp[], opts: Options, replacementPairs?: [RegExp,string][])
-{
-  if (!replacementPairs)
-    replacementPairs = getReplacementPairs(opts["replace-import"]);
+  transformImports(inputFile: string, outputFile: string)
+  {
+    var matchers = this.getMatchersFor(inputFile);
+    if (matchers.length > 0) {
+      if (this.opts.verbose)
+        console.log(`============ trying ${this.replacementPairs.length} replace-import pair(s) in ${inputFile}`);
+      var file = fs.readFileSync(inputFile, 'utf8');
+      var lines = file.split('\n');
+      if (this.transformImportsCore(lines, matchers)) {
+        fs.writeFileSync(outputFile, lines.join('\n'), 'utf8');
+        return true;
+      }
+    }
+    return false;
+  }
 
-  let changed = false;
-  for (var l = 0; l < lines.length; l++) {
-    for (var m = 0; m < matchers.length; m++) {
-      let stop = false;
-      for (var i = 0; !stop && i < lines[l].length;) {
-        stop = true;
-        let match = lines[l].slice(i).match(matchers[m]);
-        if (match != null) {
-          let importFn = match[1];
-          if (importFn === undefined)
-            break;
+  /** Scans a test file's lines for import/require commands via regex,
+   *  performing replacements on those. Regexes are imperfect but save
+   *  us the trouble of importing some huge JS/TS parser (and also allow
+   *  users to support languages other than JS/TS.)
+   *  @param matchers  Regular expressions used to locate import/require.
+   *         First capture group must be the filename. Don't use "g" option.
+   *  @param opts  opts.regex (combined with defaultRegexes) specifies how
+   *         to find import strings, and opts['replace-import'] controls
+   *         replacement patterns. Files that appear to be test files
+   *         (opts['test-files'] except opts.nontest) are left unchanged 
+   *         unless opts["replace-test-imports"] is true.
+   *  @param replacementPairs  optional: cached interpretation of 
+   *         opts['replace-import']
+   */
+  transformImportsCore(lines: string[], matchers: RegExp[])
+  {
+    let changed = false, opts = this.opts;
+    for (var l = 0; l < lines.length; l++) {
+      for (var m = 0; m < matchers.length; m++) {
+        let stop = false;
+        for (var i = 0; !stop && i < lines[l].length;) {
+          stop = true;
+          let match = lines[l].slice(i).match(matchers[m]);
+          if (match != null) {
+            let importFn = match[1];
+            if (importFn === undefined)
+              break;
 
-          // Check if a test file is imported (which should be left unchanged)
-          // Ugh: ./test.js does NOT match *test.*, so strip off ./ prefix
-          // TODO: In general I guess we should "adapt" the path to the root folder ... or something
-          let importFn2 = importFn.match(/^.[/\\]/) ? importFn.slice(2) : importFn;
-          if (opts["replace-test-imports"] ||
-            !opts["test-files"].some(tp => 
-              globmatch(importFn2 + ".js", tp) || globmatch(importFn2, tp)) ||
-            (opts.nontest || []).some(ig => globmatch(importFn, ig)))
-          {
-            // Apply replacement patterns
-            for (var [from, to] of replacementPairs) {
-              importFn = importFn.replace(from, to);
-            };
-            if (importFn !== match[1]) {
-              // A replacement was made. Insert it into the original line and redo
-              let iStart = i + match.index! + match[0].lastIndexOf(match[1]);
-              let iEnd = iStart + match[1].length;
-              lines[l] = lines[l].slice(0, iStart) + importFn + lines[l].slice(iEnd);
-              changed = true;
-              stop = false;
-              i = iStart + importFn.length;
+            // Check if a test file is imported (which should be left unchanged)
+            // Ugh: ./test.js does NOT match *test.*, so strip off ./ prefix
+            // TODO: In general I guess we should "adapt" the path to the root folder ... or something
+            let importFn2 = importFn.match(/^.[/\\]/) ? importFn.slice(2) : importFn;
+            if (opts["replace-test-imports"] ||
+              !opts["test-files"].some(tp => 
+                globmatch(importFn2 + ".js", tp) || globmatch(importFn2, tp)) ||
+              (opts.nontest || []).some(ig => globmatch(importFn, ig)))
+            {
+              // Apply replacement patterns
+              for (var [from, to] of this.replacementPairs) {
+                importFn = importFn.replace(from, to);
+              };
+              if (opts.verbose)
+                console.log(`============ replacement on line ${l}: ${match[1]} ==> ${importFn}`);
+              if (importFn !== match[1]) {
+                // A replacement was made. Insert it into the original line and redo
+                let iStart = i + match.index! + match[0].lastIndexOf(match[1]);
+                let iEnd = iStart + match[1].length;
+                lines[l] = lines[l].slice(0, iStart) + importFn + lines[l].slice(iEnd);
+                changed = true;
+                stop = false;
+                i = iStart + importFn.length;
+              }
             }
           }
         }
       }
     }
+    return changed;
   }
-  return changed;
-}
 
-function getReplacementPairs(patterns?: string[]): [RegExp,string][] {
-  if (patterns)
-    return patterns.map(v => {
-      var delim = v[v.length - 1];
-      var first = v.indexOf(delim);
-      var middle = v.indexOf(delim, first + 1);
-      return [new RegExp(v.slice(first + 1, middle)),
-              v.slice(middle + 1, v.length - 1)] as [RegExp, string];
-    });
-  else
-    return [[/\.\.?[/\\]src[/\\](.*)/, "$1"], [/\.[/\\](.*)/, "$1"]];
-}
+  static getReplacementPairs(pkgName: string, patterns?: string[]): [RegExp,string][] {
+    if (patterns)
+      return patterns.map(v => {
+        var delim = v[v.length - 1];
+        var first = v.indexOf(delim);
+        var middle = v.indexOf(delim, first + 1);
+        var regex = matchWhole(v.slice(first + 1, middle));
+        var repl = v.slice(middle + 1, v.length - 1);
+        return [new RegExp(regex.replace("$P", pkgName)),
+                            repl.replace("$P", pkgName)] as [RegExp, string];
+      });
+    else
+      return [[/^\.\.?([\/\\].*)$/, pkgName + "$1"], [/^\.\.?$/, pkgName]];
 
-var jsExts = ["js", "jsx", "mjs", "ts", "tsx"];
-export const defaultRegexes: ImportMatcher[] = [
-  { exts: jsExts, regex: /require\s*\(\s*"((?:[^\\"]|\\.)*)"/ },
-  { exts: jsExts, regex: /require\s*\(\s*'((?:[^\\']|\\.)*)'/ },
-  { exts: jsExts, regex: /[a-zA-Z0-9_}]\s*from\s*"((?:[^\\"]|\\.)*)"/ },
-  { exts: jsExts, regex: /[a-zA-Z0-9_}]\s*from\s*'((?:[^\\"]|\\.)*)'/ },
-];
-
-/** Gets regexes for finding import/require expressions in a particular file
- *  based on opts.regex. */
-export function getMatchersFor(fileName: string, opts: Options): RegExp[]
-{
-  var ext = fileName.indexOf('.') > 0 ? path.extname(fileName).slice(1) : fileName;
-  var results: RegExp[] = [];
-  for (var matcher of defaultRegexes.concat(opts.regex || [])) {
-    if (matcher.exts.indexOf(ext) > -1) {
-      if (matcher.regex instanceof RegExp)
-        results.push(matcher.regex);
-      else
-        results.push(new RegExp(matcher.regex, matcher.regexOptions));
+    function matchWhole(s: string) {
+      return s[0] === '^' || s.endsWith('$') ? s : ('^' + s + '$');
     }
   }
-  return results;
+
+  static jsExts = ["js", "jsx", "mjs", "ts", "tsx"];
+  static defaultRegexes: ImportMatcher[] = [
+    { exts: ImportTransformer.jsExts, regex: /require\s*\(\s*"((?:[^\\"]|\\.)*)"/ },
+    { exts: ImportTransformer.jsExts, regex: /require\s*\(\s*'((?:[^\\']|\\.)*)'/ },
+    { exts: ImportTransformer.jsExts, regex: /[a-zA-Z0-9_}]\s*from\s*"((?:[^\\"]|\\.)*)"/ },
+    { exts: ImportTransformer.jsExts, regex: /[a-zA-Z0-9_}]\s*from\s*'((?:[^\\"]|\\.)*)'/ },
+  ];
+  
+  /** Gets regexes for finding import/require expressions in a particular file
+   *  based on opts.regex. */
+  getMatchersFor(fileName: string): RegExp[]
+  {
+    var ext = fileName.indexOf('.') > 0 ? path.extname(fileName).slice(1) : fileName;
+    var results: RegExp[] = [];
+    for (var matcher of ImportTransformer.defaultRegexes.concat(this.opts.regex || [])) {
+      if (matcher.exts.indexOf(ext) > -1) {
+        if (matcher.regex instanceof RegExp)
+          results.push(matcher.regex);
+        else
+          results.push(new RegExp(matcher.regex, matcher.regexOptions));
+      }
+    }
+    return results;
+  }
 }
 
 /////////////////////////////////////////////////////////////////////////////

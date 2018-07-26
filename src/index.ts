@@ -29,6 +29,12 @@ if (args.help) {
         The contents of the test folder are normally deleted at the start.
         This option skips the deletion step, potentially leaving extra files
         in the test folder (also: runs faster npm ci instead of npm install)
+  --setup-command=command
+        A setup command to run instead of \`npm install\` (your package is
+        still installed afterward with \`npm install ________.tgz\` and 
+        \`npm install\` is still invoked if you use \`--install\`.) To save
+        time by skipping install when packages in the test folder are 
+        already installed, use \`--dirty --setup-command=""\`.
   -p, --packagejson=key:value, --packagejson={...}
         Merges data into the new package.json file. If the new value is a 
         primitive, it overwrites the old value. If the old value is a 
@@ -42,13 +48,19 @@ if (args.help) {
           --packagejson={testpack:undefined,repository:undefined}
   -o, --test-folder=path
         Path to test folder. Created if necessary.
-  -r, --replace-import /pat1/pat2/
+  -r, --replace-import !pat1!pat2!
         Searches js/mjs/ts/tsx test files for require/import filenames using 
-        regex pattern 1, replacing it with pattern 2 (pattern 2 can use $1
-        through $9 to re-emit captured strings). Replacements only affect
-        non-test files unless you add --replace-test-imports. If this option
-        is not used then the prefix is stripped from paths that start with 
-        \`./\` or \`./src/\` or \`../src/\`. UTF-8 encoding is assumed.
+        regex pattern 1, replacing it with pattern 2. Instead of \`!\`s you are
+        allowed to use any punctuation mark that doesn't appear in the 
+        patterns. Pattern 2 can use $1 through $9 to re-emit captured 
+        strings, and $P is replaced with your package's name. Replacements 
+        only affect non-test files unless you add --replace-test-imports. 
+        If this option is not used then the following default replacement 
+        patterns are used:
+          |\.\.?|$P| and |\.\.?([\/\\].*)|$P$1|
+        Basically, \`.\` and \`..\` are replaced with the package name. UTF-8 
+        encoding is assumed in test files, and the regex must match the whole 
+        filename unless your regex uses \`^\` or \`$\`.
   --regex ext/regex/
         For the purpose of modifying import/require commands, files with the
         specified extension(s) are searched using this regular expression,
