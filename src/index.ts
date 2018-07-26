@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import parseArgs from 'minimist';
-import {refineOptions, testPack} from './testpack-cli';
+import {refineOptions, testPack} from './testpack';
 
 // Originally --packagejson was --package.json; unfortunately minimist
 // translates it to {"package":{"json":{...}}} not {"package.json":{...}}.
