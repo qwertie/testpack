@@ -191,7 +191,7 @@ Package-preview does have one special virtue: it uses `pnpm` to isolate the pack
 Version history
 ---------------
 
-### v1.1.1 ###
+### v1.1.2 ###
 
 - Added `--setup-command` option.
 - Changed how imports are transformed. Initially the prefix `./` or `../` or `../src` was simply stripped off, but in v1.1 `.` or `..` is replaced with the package name, and `src` is no longer treated specially.

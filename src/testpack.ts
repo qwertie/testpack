@@ -190,6 +190,8 @@ export function refineOptions(args: any): Options {
     maybeUpgradeToArrayOfString(args, k, false);
     expect((args[k] as string[]).every(v => v[0] === v[v.length-1] && v.indexOf(v[0], 1) < v.length-1), 
       "Syntax error in replace-import: expected three slashes/delimiters");
+    // Check regex syntax (SyntaxError thrown if invalid)
+    ImportTransformer.getReplacementPairs('$P', args[k]);
   }
   expectType(args, 'replace-test-imports', 'boolean');
 
@@ -462,7 +464,8 @@ export class ImportTransformer
             {
               // Apply replacement patterns
               for (var [from, to] of this.replacementPairs) {
-                importFn = importFn.replace(from, to);
+                if ((importFn = importFn.replace(from, to)) !== match[1])
+                  break;
               };
               if (opts.verbose)
                 console.log(`============ replacement on line ${l}: ${match[1]} ==> ${importFn}`);
