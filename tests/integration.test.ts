@@ -13,7 +13,7 @@ if (insideTestFolder === false) {
     var args = {
       "test-folder": testFolder,
       "setup-command": "npm install",
-      rmdir: true,
+      rmdir: false,
       verbose: true
     };
     

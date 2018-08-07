@@ -1,14 +1,14 @@
 {
   "name": "testpack-cli",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "Verifies that your package will work after it is published by running your unit tests in a special test folder.",
   "main": "dist/testpack.js",
   "scripts": {
     "test": "tsc && npm run set-ci && jest",
     "set-ci": "set CI=true || CI=true",
-    "set-ci//": "echo //jest must run in CI mode to avoid very messy output. `||` separates Windows & Linux shell commands",
+    "set-ci//": "# jest must run in CI mode to avoid very messy output. `||` separates Windows & Linux shell commands",
     "prepare": "tsc",
-    "testpack": "tsc && node dist/index.js --verbose",
+    "testpack": "tsc && node dist/index.js --verbose --rmdir",
     "safePublish": "npm run testpack && npm publish"
   },
   "repository": {
@@ -79,7 +79,8 @@
       "jsx",
       "json"
     ],
-    "bail": true
+    "bail": true,
+    "testEnvironment": "node"
   },
   "testpack": {
     "test-folder": "Dress rehearsal",

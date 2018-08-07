@@ -21,6 +21,7 @@ export type PackageJson = {
 };
 export type ImportMatcher = { exts:string[], regex:string|RegExp, regexOptions?:string };
 
+// See index.ts / readme.md for documentation
 export interface Options {
   "test-files": string[];      // glob patterns
   "nontest"?: string[];        // files not to be treated as tests
@@ -135,7 +136,7 @@ export function testPack(opts: Options): SpawnSyncReturns<Buffer>
       if (opts.rmdir) {
         console.log(`========== testpack: deleting ${testFolder}`);
         try {
-          fsextra.remove(testFolder);
+          fsextra.removeSync(testFolder);
         } catch(e) {
           console.log(`========== ERROR: ${e.message}`);
         }
