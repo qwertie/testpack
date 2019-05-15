@@ -1,6 +1,6 @@
 {
   "name": "testpack-cli",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "description": "Verifies that your package will work after it is published by running your unit tests in a special test folder.",
   "main": "dist/testpack.js",
   "scripts": {
@@ -41,9 +41,9 @@
     "@types/glob": "^5.0.35",
     "@types/jest": "^23.1.5",
     "@types/minimist": "^1.2.0",
-    "@types/node": "^10.5.2",
+    "@types/node": "^10.14.6",
     "@types/underscore": "^1.8.8",
-    "jest": "^23.4.0",
+    "jest": "^23.6.0",
     "ts-jest": "^23.0.0",
     "ts-node": "^7.0.0",
     "typescript": "^2.9.2"
@@ -84,11 +84,19 @@
   },
   "testpack": {
     "test-folder": "Dress rehearsal",
-    "regex": "ts,js#insideTestFolder = (false)#",
-    "replace-import": ["|false|'yes'|", "|\\.\\.?([\\/\\\\].*)|$P$1|", "|\\.\\.?|$P|"],
-    "install": ["ts-jest", "babel-core", "typescript"],
+    "regex": "ts,js#insideTestFolder.* = (false)#",
+    "replace-import": [
+      "|false|'yes'|",
+      "|\\.\\.?([\\/\\\\].*)|$P$1|",
+      "|\\.\\.?|$P|"
+    ],
+    "install": [
+      "ts-jest",
+      "babel-core",
+      "typescript"
+    ],
     "packagejson": {
-      "scripts": { 
+      "scripts": {
         "fix-ts-jest": "mkdir src && echo \"//required for ts-jest to workaround issue #618\" > src/dummy.ts || cd .",
         "test": "npm run fix-ts-jest && jest && testpack --show-json"
       }

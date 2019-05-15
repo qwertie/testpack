@@ -41,13 +41,10 @@ Here's what it does:
    in the test folder.
 8. It runs `npm run test` (or another script according to `--test-script`)
 
-All command-line options are optional. By default, if your test files
-have `import` or `require` commands that refer to a string starting with
-`./` or `../src/`, that prefix will be stripped out of the copy unless
-they refer to one of the test files. 
-
 Options
 -------
+
+All command-line options are optional.
 
 ~~~
 --dirty
@@ -57,7 +54,7 @@ Options
 --setup-command=command
       A setup command to run instead of `npm install` (your package is
       still installed afterward with `npm install ________.tgz` and 
-      `npm install` is still invoked if you use `--install`.) To save
+      `npm install` is still used by the `--install` option.) To save
       time by skipping install when packages in the test folder are 
       already installed, use `--dirty --setup-command=""`.
 -p, --packagejson=key:value  
@@ -136,7 +133,7 @@ is equivalent to `--test-script=foo --verbose`.
 How to use testpack
 -------------------
 
-1. Prepare to your package for publishing as you normally would ([see also](http://typescript-react-primer.loyc.net/publish-npm-package.html))
+1. Prepare to your package for publishing as you normally would ([guide](http://typescript-react-primer.loyc.net/publish-npm-package.html))
 2. In a terminal: `npm install --save-dev --global testpack-cli`
 3. Run it with: `testpack` (add `--verbose` for more detail)
 4. Run `npm publish` once your tests pass.
@@ -192,6 +189,10 @@ Package-preview does have one special virtue: it uses `pnpm` to isolate the pack
 
 Version history
 ---------------
+
+### v1.1.4 ###
+
+- Now works with scoped packages (#2)
 
 ### v1.1.2 ###
 

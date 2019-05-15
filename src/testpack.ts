@@ -56,7 +56,7 @@ export function testPack(opts: Options): SpawnSyncReturns<Buffer>
   opts = combineOptions(pkg, opts);
   if (opts.verbose)
     console.log(`============ testpack options: ${JSON.stringify(opts,null,2)}`);
-  var pkgName = pkg.name || 'untitled';
+  var pkgName = getNameWithoutSlash(pkg);
   var testFolder = opts["test-folder"] || path.join('..', pkgName + '-testpack');
   
   // Since we plan to delete the test folder, let's make sure it's not the 
@@ -355,8 +355,14 @@ export function transformPackageJson(pkg: PackageJson, opts: Options): PackageJs
   return pkg;
 }
 
+// Converts pkg.name of @scoped/package to scoped-package. This function is 
+// used to predict the .tgz produced by npm AND to choose the test folder.
+export function getNameWithoutSlash(pkg: PackageJson) {
+  return (pkg.name || 'undefined').replace(/@([^\/]*)\/(.*)/, "$1-$2");
+}
+
 export function runNpmPack(pkg: PackageJson, opts: Options): string {
-  var pkgName = `${pkg['name']}-${pkg['version']}.tgz`;
+  var pkgName = `${getNameWithoutSlash(pkg)}-${pkg['version']}.tgz`;
   if (typeof opts.prepacked === 'string')
     pkgName = opts.prepacked;
   if (!opts.prepacked) {

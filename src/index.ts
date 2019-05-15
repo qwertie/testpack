@@ -32,7 +32,7 @@ if (args.help) {
   --setup-command=command
         A setup command to run instead of \`npm install\` (your package is
         still installed afterward with \`npm install ________.tgz\` and 
-        \`npm install\` is still invoked if you use \`--install\`.) To save
+        \`npm install\` is still used by the \`--install\` option.) To save
         time by skipping install when packages in the test folder are 
         already installed, use \`--dirty --setup-command=""\`.
   -p, --packagejson=key:value, --packagejson={...}

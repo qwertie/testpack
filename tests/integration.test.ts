@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as tp from "..";
 
 // Our package.json options change false to 'yes' to prevent recursive operation
-var insideTestFolder = false;
+var insideTestFolder: any = false;
 if (insideTestFolder === false) {
   test('Dress rehearsal', () => {
     var testFolder = "Dress rehearsal";

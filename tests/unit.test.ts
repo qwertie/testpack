@@ -200,3 +200,12 @@ test('transformImportsCore', () => {
     "the_end"
   ]);
 });
+
+test('getNameWithoutSlash', () => {
+  var pkg = { 
+    "name": "@my-scoped/package", 
+    "version": "1.0.0",
+    "dependencies": {"etc": "1.0.0"}
+  } as tp.PackageJson;
+  expect(tp.getNameWithoutSlash(pkg)).toEqual("my-scoped-package");
+});
